@@ -444,15 +444,128 @@ def add_soma_data(df, inside_props, pad = 3):
 
             props = [max(props, key=lambda x: x.area)]
 
-        df.at[ind,'inside_image'] = props[0].image
+        if 'image' in inside_props:
+            df.at[ind,'inside_image'] = props[0].image
 
-        df.loc[ind,'inside_bbox-0'] = int(props[0].bbox[0] + row['bbox-0'])
-        df.loc[ind,'inside_bbox-1'] = int(props[0].bbox[1] + row['bbox-1'])
-        df.loc[ind,'inside_bbox-2'] = int(props[0].bbox[2] + row['bbox-0'])
-        df.loc[ind,'inside_bbox-3'] = int(props[0].bbox[3] + row['bbox-1'])
+        if 'bbox' in inside_props:
+            df.loc[ind,'inside_bbox-0'] = int(props[0].bbox[0] + row['bbox-0'])
+            df.loc[ind,'inside_bbox-1'] = int(props[0].bbox[1] + row['bbox-1'])
+            df.loc[ind,'inside_bbox-2'] = int(props[0].bbox[2] + row['bbox-0'])
+            df.loc[ind,'inside_bbox-3'] = int(props[0].bbox[3] + row['bbox-1'])
+        
+        if 'centroid' in inside_props:
+            df.loc[ind,'inside_centroid-0'] = int(props[0].centroid[0] + row['bbox-0'])
+            df.loc[ind,'inside_centroid-1'] = int(props[0].centroid[1] + row['bbox-1'])
 
-        for col in inside_props:
+        for col in [x for x in inside_props if x not in ['image', 'bbox', 'centroid']]:
             df.loc[ind, f'inside_{col}'] = props[0][col]
 
     return df
+
+def mark_tile_edge_objects(df, pad=0, filter='all'):
+    """
+    Flags objects whose bounding boxes are close to the tile boundaries.
+
+    Adds a new boolean column 'tile_edge_object' to the DataFrame, where True indicates 
+    that the object's bounding box lies within a specified padding distance from any edge 
+    of the tile it resides in. Useful for filtering out objects that may be partially cut off 
+    or affected by edge effects in tiled image analysis.
+
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        A DataFrame containing at least the following columns:
+            - 'bbox-0', 'bbox-1', 'bbox-2', 'bbox-3': bounding box (min_row, min_col, max_row, max_col)
+            - 'tile_row_start', 'tile_row_end', 'tile_col_start', 'tile_col_end': tile boundaries
+
+    pad : int, optional (default=0)
+        The number of pixels to consider as a buffer zone around the tile edges. 
+        If any part of the bounding box is within this padding distance of the tile 
+        boundary, the object is flagged as being on the edge.
+
+    filter : str, optional (default='all')
+        Determines which rows to return:
+            - 'all': return all rows with 'tile_edge_object' column
+            - 'edge': return only rows where tile_edge_object is True
+            - 'not_edge': return only rows where tile_edge_object is False
+
+    Returns:
+    --------
+    pandas.DataFrame
+        The filtered DataFrame, including the 'tile_edge_object' column.
+
+    Raises:
+    -------
+    ValueError
+        If `filter` is not one of {'all', 'edge', 'not_edge'}.
+
+    Example:
+    --------
+    >>> df = mark_tile_edge_objects(df, pad=5, filter='not_edge')
+    >>> len(df)
+    # Returns number of non-edge objects
+    """
+    def is_on_tile_edge(row):
+        return (
+            row['bbox-0'] <= row['tile_row_start'] + pad or
+            row['bbox-2'] >= row['tile_row_end'] - pad or
+            row['bbox-1'] <= row['tile_col_start'] + pad or
+            row['bbox-3'] >= row['tile_col_end'] - pad
+        )
+
+    df['tile_edge_object'] = df.apply(is_on_tile_edge, axis=1)
+
+    if filter == 'all':
+        return df
+    elif filter == 'edge':
+        return df[df['tile_edge_object']].copy()
+    elif filter == 'not_edge':
+        return df[~df['tile_edge_object']].copy()
+    else:
+        raise ValueError("Invalid value for filter. Must be one of: 'all', 'edge', 'not_edge'")
     
+def extract_cropped_images(df, image, pad=50, prefix=''):
+    """
+    Extract square image crops centered around specified centroids in a DataFrame.
+
+    For each row in the DataFrame, this function uses the coordinates in the 
+    'centroid-0' and 'centroid-1' columns to extract a square region from the 
+    input image. The size of the crop is determined by the `pad` value 
+    (i.e., crop size = 2 * pad). The resulting cropped image is stored in a new 
+    DataFrame column named '{prefix}_image'.
+
+    Parameters:
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing centroid coordinates under 'centroid-0' and 'centroid-1'.
+    image : array-like
+        2D or ND image array (e.g., a Dask array) from which regions will be extracted.
+    pad : int, optional
+        Number of pixels to include on each side of the centroid (default is 50).
+    prefix : str, optional
+        Prefix for the new column name that stores the extracted image regions 
+        (default is '', resulting in 'image').
+
+    Returns:
+    -------
+    df : pandas.DataFrame
+        The input DataFrame with an additional column named '{prefix}_image' containing
+        the cropped image regions as objects (NumPy arrays).
+    """
+
+    # Make sure the column exists and can store arbitrary objects
+    df[f'{prefix}_image'] = None
+    df[f'{prefix}_image'] = df[f'{prefix}_image'].astype(object)
+
+    for ind, row in df.iterrows():
+        row_start = int(row['centroid-0'] - pad)
+        row_stop = int(row['centroid-0'] + pad)
+        col_start = int(row['centroid-1'] - pad)
+        col_stop = int(row['centroid-1'] + pad)
+
+        # Crop and compute image block
+        im_object = image[row_start:row_stop, col_start:col_stop].compute()
+        
+        df.at[ind, f'{prefix}_image'] = im_object
+
+    return df
