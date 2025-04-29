@@ -1,3 +1,5 @@
+import re
+from pathlib import Path
 import dask.array as da
 import pandas as pd
 import numpy as np
@@ -569,3 +571,28 @@ def extract_cropped_images(df, image, pad=50, prefix=''):
         df.at[ind, f'{prefix}_image'] = im_object
 
     return df
+
+def label_func(o):
+    """
+    Extracts a label from a filename based on a specific naming convention.
+
+    The function expects the input `o` to represent a file path with a name 
+    matching the pattern: "<label>_XXXXXX.tif", where <label> is an arbitrary 
+    string without underscores, and XXXXXX is a 6-digit number.
+
+    Parameters:
+        o (str or Path): A path to the file whose name will be parsed.
+
+    Returns:
+        str: The extracted label from the filename.
+
+    Raises:
+        AssertionError: If the filename does not match the expected pattern.
+    """
+    pat = re.compile(r'^([^_]+)_\d{6}\.tif$')
+
+    o = Path(o)
+    match = pat.match(o.name)
+    assert match, f'Pattern failed on {o.name}'
+    label = match.group(1)
+    return label  # "discard" if label == "discard" else "mito"
