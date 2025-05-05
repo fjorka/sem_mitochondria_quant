@@ -1,0 +1,36 @@
+# pyproject.toml
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sem_quant"
+version = "0.1.0"
+description = "Axon and Mitochondria Segmentation Pipeline from SEM images."
+requires-python = ">=3.8" 
+
+# --- List ALL your dependencies here ---
+# lightweight essentials
+dependencies = [
+    "pandas",
+    "numpy",
+    "scikit-image",
+    "loguru",
+    "tqdm",
+    "pydantic",
+    "dask",
+    "tifffile[zarr]"
+]
+
+# --- Optional dependencies ---
+# pip install .[fastai,sam]
+[project.optional-dependencies]
+fastai = ["torch>=2.0", "fastai"]
+sam = ["sam-2 @ git+https://github.com/facebookresearch/segment-anything-2.git"]
+
+[tool.setuptools.packages.find]
+where = ["."] # Look for packages in the current directory (root)
+include = ["sem_quant*"] # find the 'sem_quant' package and sub-packages
+exclude = ["tests*"] 
+

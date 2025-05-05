@@ -1,0 +1,32 @@
+# Byte-compiled files
+__pycache__/
+*.py[cod]
+
+# Jupyter Notebook checkpoints and temp files
+.ipynb_checkpoints/
+*.ipynb_checkpoints/
+*.ipynb~ 
+*.bak
+
+# VS Code or PyCharm settings
+.vscode/
+.idea/
+
+# Environment folders
+env/
+.venv/
+venv/
+
+# Build outputs
+build/
+dist/
+*.egg-info/
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Large or private datasets (edit as needed)
+data/
+results/
+outputs/

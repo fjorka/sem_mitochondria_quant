@@ -1,4 +1,7 @@
+import os
 import re
+import platform
+import ntpath
 from pathlib import Path
 import dask.array as da
 import pandas as pd
@@ -11,49 +14,6 @@ from skimage.morphology import remove_small_holes
 from scipy.ndimage import binary_fill_holes
 
 
-def tile_image(image, tile_size_x=1024, tile_size_y=1024, tile_overlap_x=300, tile_overlap_y=300):
-    """
-    Tiles an image into overlapping patches.
-    
-    Args:
-        image (np.ndarray): The input image (H, W, C) or (H, W).
-        tile_size_x (int): Width of each tile.
-        tile_size_y (int): Height of each tile.
-        tile_overlap_x (int): Overlap between tiles horizontally.
-        tile_overlap_y (int): Overlap between tiles vertically.
-        
-    Returns:
-        tiles (list of np.ndarray): List of image tiles.
-        coords (list of tuple): List of (x_start, y_start, x_end, y_end) for each tile.
-    """
-    tiles = []
-    coords = []
-
-    H, W = image.shape[:2]
-
-    stride_x = tile_size_x - tile_overlap_x
-    stride_y = tile_size_y - tile_overlap_y
-
-    for y in range(0, H, stride_y):
-        for x in range(0, W, stride_x):
-            x_start = x
-            y_start = y
-            x_end = min(x + tile_size_x, W)
-            y_end = min(y + tile_size_y, H)
-
-            # Adjust start if we're at the edge and the tile is smaller
-            if x_end - x_start < tile_size_x:
-                x_start = max(0, W - tile_size_x)
-                x_end = W
-            if y_end - y_start < tile_size_y:
-                y_start = max(0, H - tile_size_y)
-                y_end = H
-
-            tile = image[y_start:y_end, x_start:x_end]
-            tiles.append(tile)
-            coords.append((x_start, y_start, x_end, y_end))
-
-    return tiles, coords
 
 def extract_regionprops(row,properties,small_size = 100):
     """
@@ -571,28 +531,3 @@ def extract_cropped_images(df, image, pad=50, prefix=''):
         df.at[ind, f'{prefix}_image'] = im_object
 
     return df
-
-def label_func(o):
-    """
-    Extracts a label from a filename based on a specific naming convention.
-
-    The function expects the input `o` to represent a file path with a name 
-    matching the pattern: "<label>_XXXXXX.tif", where <label> is an arbitrary 
-    string without underscores, and XXXXXX is a 6-digit number.
-
-    Parameters:
-        o (str or Path): A path to the file whose name will be parsed.
-
-    Returns:
-        str: The extracted label from the filename.
-
-    Raises:
-        AssertionError: If the filename does not match the expected pattern.
-    """
-    pat = re.compile(r'^([^_]+)_\d{6}\.tif$')
-
-    o = Path(o)
-    match = pat.match(o.name)
-    assert match, f'Pattern failed on {o.name}'
-    label = match.group(1)
-    return label  # "discard" if label == "discard" else "mito"
