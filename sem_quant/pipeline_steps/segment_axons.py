@@ -252,7 +252,7 @@ if __name__ == "__main__":
         analysis_dir = Path(smart_path(config.paths.analysis_dir))
         log_dir = analysis_dir / LOGS_SUBDIR
         log_dir.mkdir(parents=True, exist_ok=True)
-        log_file_path = log_dir / f"classify_mitos_{{time}}.log"
+        log_file_path = log_dir / f"segment_axons_{{time}}.log"
     except Exception as e:
          print(f"WARNING: Error determining log path from config: {e}.")
          exit(1)
