@@ -49,17 +49,9 @@ def setup_sam_mask_generator(model_config_path: str, checkpoint_path: str, seg_p
     logger.info(f"Setting up SAM model from config: {model_config_path} and checkpoint: {checkpoint_path}")
     logger.info(f"Using segmentation parameters: {seg_params.dict()}") # Log the parameters being used
 
-    # Load the config file directly (bypassing Hydra)
-    if Path(model_config_path).is_file():
-        logger.info(f"Loading SAM config YAML directly from: {model_config_path}")
-        model_cfg = OmegaConf.load(model_config_path)
-    else:
-        logger.error(f"SAM config file not found: {model_config_path}")
-        return None
-
     try:
         # apply_postprocessing=False as seen in notebooks
-        sam_model = build_sam2(model_cfg, checkpoint_path, device=device, apply_postprocessing=False)
+        sam_model = build_sam2(model_config_path, checkpoint_path, device=device, apply_postprocessing=False)
         logger.info("SAM2 model built successfully.")
 
         # Dynamically get parameters from the passed seg_params object
