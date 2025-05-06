@@ -340,7 +340,7 @@ def run_axon_processing(config: PipelineConfig):
     logger.info(f"Final processed axon count: {len(df_final)}")
 
     # --- Save Final DataFrame ---
-    output_filename = f"{output_prefix}{axons_data_suffix}_test_{ANNOTATION_SUFFIX}"
+    output_filename = f"{output_prefix}{axons_data_suffix}{ANNOTATION_SUFFIX}"
     output_path = analysis_dir / output_filename
     try:
         # Ensure necessary columns like 'image' and 'inside_image' (if present) contain serializable data (numpy arrays)

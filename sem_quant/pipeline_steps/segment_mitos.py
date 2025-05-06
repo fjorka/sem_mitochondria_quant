@@ -4,6 +4,7 @@
 
 import argparse
 import os
+import sys
 import time
 import gc
 import pickle as pkl
@@ -218,3 +219,6 @@ if __name__ == "__main__":
         main(config) # Pass the loaded config
     except Exception as e:
         logger.exception("Pipeline step failed with an unhandled exception.")
+
+    # --- Successful Exit ---
+    sys.exit(0)

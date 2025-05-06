@@ -36,31 +36,6 @@ def setup_logging(log_file_path, console_level="INFO", file_level="DEBUG"):
         logger.info(f"Logging setup partially complete (Console only). Console: {console_level}")
         return False
 
-def label_func(o):
-    """
-    Extracts a label from a filename based on a specific naming convention.
-
-    The function expects the input `o` to represent a file path with a name 
-    matching the pattern: "<label>_XXXXXX.tif", where <label> is an arbitrary 
-    string without underscores, and XXXXXX is a 6-digit number.
-
-    Parameters:
-        o (str or Path): A path to the file whose name will be parsed.
-
-    Returns:
-        str: The extracted label from the filename.
-
-    Raises:
-        AssertionError: If the filename does not match the expected pattern.
-    """
-    pat = re.compile(r'^([^_]+)_\d{6}\.tif$')
-
-    o = Path(o)
-    match = pat.match(o.name)
-    assert match, f'Pattern failed on {o.name}'
-    label = match.group(1)
-    return label  # "discard" if label == "discard" else "mito"
-
 def running_in_wsl():
     """Detect if the current environment is WSL."""
     return 'microsoft-standard' in platform.uname().release or 'WSL' in platform.version()
