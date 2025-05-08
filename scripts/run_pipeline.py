@@ -44,13 +44,14 @@ STEPS_SUBPACKAGE_DIR = "pipeline_steps"
 # Set to None to use the same environment as this script.
 # Example Linux/macOS: "/path/to/your/venv/bin/python"
 # Example Windows: r"C:\path\to\your\venv\Scripts\python.exe"
-DEFAULT_PYTHON_ENV: str | None = None
+DEFAULT_PYTHON_ENV: str | None = "/h20/home/lab/miniconda3/envs/sam-env/bin/python"
 # Example: DEFAULT_PYTHON_ENV = "/home/user/venvs/sem_quant_default/bin/python"
 
 # Define specific Python environments for individual steps (optional overrides).
 # Keys are the script filenames from PIPELINE_STEPS.
 # Values are paths to the Python executables for those steps.
 STEP_PYTHON_ENVS: dict[str, str] = {
+    "classify_mitos.py": r"/h20/home/lab/miniconda3/envs/fastai-kasia/bin/python"
     # Example: Override environment for segmentation steps
     # "segment_axons.py": "/path/to/segmentation_env/bin/python",
     # "segment_mitos.py": "/path/to/segmentation_env/bin/python",
