@@ -12,11 +12,11 @@ import sys
 import time
 from pathlib import Path
 from loguru import logger
-import os # Import os for path validation if needed
+import os 
+import importlib.resources
 
 # Attempt to import shared utilities from the 'sem_quant' package
 try:
-    # Assuming load_config still handles the *pipeline parameters* from the JSON
     from sem_quant.load_config import load_config, PipelineConfig # Or just load_config if it returns a dict
     from sem_quant.utils import setup_logging, smart_path
 except ImportError as e:
@@ -27,7 +27,7 @@ except ImportError as e:
 
 # --- Constants ---
 LOGS_SUBDIR = 'logs'
-# Define the sequence of pipeline step scripts relative to sem_quant/pipeline_steps/
+
 PIPELINE_STEPS = [
     "segment_axons.py",
     "process_axons.py",
@@ -42,24 +42,14 @@ STEPS_SUBPACKAGE_DIR = "pipeline_steps"
 
 # Set the default Python executable path.
 # Set to None to use the same environment as this script.
-# Example Linux/macOS: "/path/to/your/venv/bin/python"
-# Example Windows: r"C:\path\to\your\venv\Scripts\python.exe"
 DEFAULT_PYTHON_ENV: str | None = "/h20/home/lab/miniconda3/envs/sam-env/bin/python"
-# Example: DEFAULT_PYTHON_ENV = "/home/user/venvs/sem_quant_default/bin/python"
 
 # Define specific Python environments for individual steps (optional overrides).
 # Keys are the script filenames from PIPELINE_STEPS.
 # Values are paths to the Python executables for those steps.
 STEP_PYTHON_ENVS: dict[str, str] = {
     "classify_mitos.py": r"/h20/home/lab/miniconda3/envs/fastai-kasia/bin/python"
-    # Example: Override environment for segmentation steps
-    # "segment_axons.py": "/path/to/segmentation_env/bin/python",
-    # "segment_mitos.py": "/path/to/segmentation_env/bin/python",
-
-    # Example: Use a different env for classification
-    # "classify_mitos.py": r"C:\envs\tf_env\Scripts\python.exe",
 }
-# --- End Environment Configuration ---
 
 
 def get_python_executable(
@@ -80,20 +70,14 @@ def get_python_executable(
     """
     # Prioritize step-specific environment
     if step_envs and step_script_name in step_envs:
+
         specific_path = step_envs[step_script_name]
-        # Optional: Add validation here if desired
-        # if not Path(specific_path).is_file():
-        #     logger.warning(f"Step-specific Python env not found for {step_script_name} at {specific_path}. Falling back.")
-        # else:
         logger.debug(f"Using step-specific environment for {step_script_name}: {specific_path}")
         return specific_path
 
     # Fallback to default environment
-    if default_env_path:
-        # Optional: Add validation here if desired
-        # if not Path(default_env_path).is_file():
-        #     logger.warning(f"Default Python env not found at {default_env_path}. Falling back.")
-        # else:
+    elif default_env_path:
+
         logger.debug(f"Using default environment for {step_script_name}: {default_env_path}")
         return default_env_path
 
@@ -171,7 +155,8 @@ def run_step(
         return False
 
 
-def main():
+def run_pipeline():
+    
     """Parses arguments, loads config, sets up logging, and runs the pipeline steps."""
     parser = argparse.ArgumentParser(
         description="Run the SEM Mitochondria Quantification pipeline using environments defined in this script."
@@ -188,19 +173,18 @@ def main():
     if DEFAULT_PYTHON_ENV and not Path(DEFAULT_PYTHON_ENV).is_file():
         print(f"WARNING: Default Python environment executable not found: {DEFAULT_PYTHON_ENV}. "
               "Will attempt to fall back to current environment or step-specific ones.")
-        # Optionally set to None if you want fallback behavior on error:
-        # validated_default_env = None
 
+    # changes provided dict of step envs to only include those that exist
     validated_step_envs = {}
     for step, path in STEP_PYTHON_ENVS.items():
         if not Path(path).is_file():
              print(f"WARNING: Step-specific Python executable for '{step}' not found: {path}. "
                    "This step will use the default or current environment.")
         else:
-             validated_step_envs[step] = path # Only add valid paths
+             validated_step_envs[step] = path
 
     # --- Load Configuration (for pipeline parameters) ---
-    config = None # Use PipelineConfig object or dict depending on load_config
+    config = None 
     try:
         config_file_input_path = Path(smart_path(args.config_path))
         if not config_file_input_path.is_file():
@@ -216,19 +200,14 @@ def main():
         print(f"FATAL: Failed to load configuration '{args.config_path}': {e}")
         sys.exit(1)
 
-    # --- Setup Logging for the Orchestrator ---
+    # --- Setup Logging ---
     try:
-        # Access analysis_dir from the loaded config object/dict
-        if isinstance(config, dict): # If load_config returns a dict
-            analysis_dir_str = config.get("paths", {}).get("analysis_dir", ".")
-        else: # Assuming it's an object like PipelineConfig
-             # Check if 'paths' attribute exists and has 'analysis_dir'
-            if hasattr(config, 'paths') and hasattr(config.paths, 'analysis_dir'):
-                 analysis_dir_str = config.paths.analysis_dir
-            else:
-                 # Handle case where config structure is unexpected
-                 print("FATAL: Cannot determine 'analysis_dir' from loaded configuration.")
-                 sys.exit(1)
+        if hasattr(config, 'paths') and hasattr(config.paths, 'analysis_dir'):
+            analysis_dir_str = config.paths.analysis_dir
+        else:
+            # Handle case where config structure is unexpected
+            print("FATAL: Cannot determine 'analysis_dir' from loaded configuration.")
+            sys.exit(1)
 
         analysis_dir = Path(smart_path(analysis_dir_str))
         log_dir = analysis_dir / LOGS_SUBDIR
@@ -248,15 +227,33 @@ def main():
         logger.add(sys.stderr, level="INFO")
 
     # --- Determine Package Path ---
+    sem_quant_package_root: Path | None = None # Initialize
     try:
-        project_root = Path(__file__).resolve().parent.parent
-        sem_quant_root = project_root / "sem_quant"
-        if not (sem_quant_root / "__init__.py").is_file():
-             logger.warning(f"Could not definitively locate 'sem_quant' package directory at: {sem_quant_root}. Assuming relative imports within steps will work.")
-        logger.debug(f"Project root estimated as: {project_root}")
-        logger.debug(f"Package 'sem_quant' path estimated as: {sem_quant_root}")
+        # Dynamically find the path to the installed 'sem_quant' package directory
+        # importlib.resources.files returns a Traversable object representing the package directory
+        package_files_ref = importlib.resources.files('sem_quant')
+
+        # Convert the Traversable to an absolute Path object
+        sem_quant_package_root = Path(package_files_ref).resolve()
+
+        # Optional: Basic sanity check (might be redundant if importlib found it)
+        if not sem_quant_package_root.is_dir() or not (sem_quant_package_root / "__init__.py").is_file():
+             logger.error(f"FATAL: Dynamically located path '{sem_quant_package_root}' does not appear "
+                          f"to be the 'sem_quant' package directory (__init__.py missing or not a dir).")
+             sys.exit(1)
+
+        logger.info(f"Dynamically located 'sem_quant' package root: {sem_quant_package_root}")
+
+    except ModuleNotFoundError:
+        logger.error("FATAL: The 'sem_quant' package was not found in the current Python environment.")
+        logger.error(f"Please ensure 'sem_quant' is installed in the environment running this script: "
+                     f"'{sys.executable}'. You might need to run 'pip install .' or 'pip install -e .' "
+                     f"in the project directory.")
+        sys.exit(1)
+
     except Exception as e:
-         logger.error(f"Could not determine necessary paths: {e}")
+         # Log the full exception details for debugging
+         logger.exception(f"FATAL: An unexpected error occurred while dynamically locating the 'sem_quant' package: {e}")
          sys.exit(1)
 
     # --- Execute Pipeline Steps ---
@@ -264,23 +261,21 @@ def main():
     pipeline_start_time = time.time()
 
     for step_script in PIPELINE_STEPS:
-        # Pass the environment constants defined in this script
         success = run_step(
             step_script,
-            config_file_abs_path, # Pass path to param config
-            sem_quant_root,
-            validated_default_env,   # Pass the script's default env constant
-            validated_step_envs      # Pass the script's step env constant dict
+            config_file_abs_path,
+            sem_quant_package_root, # package root
+            validated_default_env, # script's default env constant
+            validated_step_envs  # script's step env constant dict
         )
         if not success:
             logger.error(f"Pipeline execution failed during step: {step_script}")
             logger.info("=== Pipeline Execution FAILED ===")
-            sys.exit(1)
+            sys.exit(1) # Exit with non-zero code on failure
 
     pipeline_duration = time.time() - pipeline_start_time
     logger.info(f"=== Pipeline Execution Completed Successfully in {pipeline_duration:.2f}s ===")
-    sys.exit(0)
-
+    sys.exit(0) # Exit with zero code on success
 
 if __name__ == "__main__":
-    main()
+    run_pipeline()
